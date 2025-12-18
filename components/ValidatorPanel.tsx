@@ -44,6 +44,9 @@ const ValidatorPanel: React.FC<ValidatorPanelProps> = ({ data }) => {
                     <div className="text-gray-500 mt-0.5">
                         Hoja: {config.sheet}
                     </div>
+                    {typeof parsed.discardedColumns === 'number' && parsed.discardedColumns > 0 && (
+                        <div className="text-amber-700 mt-0.5">Columnas omitidas: {parsed.discardedColumns}</div>
+                    )}
                     {isError && parsed.validation.errors.map((e, i) => (
                         <div key={i} className="text-red-500 mt-0.5">{e}</div>
                     ))}

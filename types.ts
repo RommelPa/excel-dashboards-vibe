@@ -4,6 +4,7 @@ export interface SeriesConfig {
   nameCell?: string;   // Single cell for name
   nameRange?: string;  // Range for name (merged)
   valuesStartCell: string; // Dynamic: Start cell for data row
+  valueHeaderPattern?: string;
   renderType?: 'bar' | 'line' | 'area';
   stack?: boolean | string;
 }
@@ -17,6 +18,8 @@ export interface ChartConfig {
   // Dynamic Range Configuration
   categoryStartCell: string;       // Where categories start (e.g. "C3")
   categoryStartCellRow2?: string;  // For "Margen Comercial" (second row of header)
+  categoryHeaderPattern?: string;
+  maxConsecutiveBlanks?: number;
   
   series: SeriesConfig[];
   type: 'bar' | 'line' | 'area';
@@ -40,6 +43,7 @@ export interface ParsedChartData {
   categories: string[];
   series: ParsedSeries[];
   calculatedRange: string; // e.g., "C3:DR3" (calculated dynamically)
+  discardedColumns?: number;
   validation: {
     sheetExists: boolean;
     hasData: boolean;
@@ -64,6 +68,8 @@ export interface SharePointConfig {
   enabled: boolean;
   facturacionLink: string;
   balanceLink: string;
+  facturacionShareId?: string;
+  balanceShareId?: string;
   autoRefresh: boolean; // 15 min
   refreshIntervalMinutes: number;
   lastSync?: string; // ISO Date

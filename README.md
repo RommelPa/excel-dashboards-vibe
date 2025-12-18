@@ -1,20 +1,26 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Excel Dashboards Vibe
 
-# Run and deploy your AI Studio app
+Panel React para validar y visualizar dashboards de Excel con soporte de sincronización desde SharePoint/Graph.
 
-This contains everything you need to run your app locally.
+## Requisitos
+- Node.js 18+
+- Cuenta de Microsoft con permisos de lectura en los archivos de SharePoint configurados.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1ScT_f9Qlu-TAd_KHhghV8p8Adqg4lFLZ
+## Configuración
+1. Copia `.env.example` a `.env` y completa los valores:
+   - `VITE_MSAL_CLIENT_ID` y `VITE_MSAL_AUTHORITY` para MSAL.
+   - `VITE_SHAREPOINT_FACTURACION_URL` y `VITE_SHAREPOINT_BALANCE_URL` sin parámetros de token (`?e=...`).
+   - `VITE_BLANK_THRESHOLD` y `VITE_MAX_FILE_SIZE_MB` para ajustar la extracción y validación.
+2. Instala dependencias: `npm install`.
+3. Ejecuta en desarrollo: `npm run dev`.
 
-## Run Locally
+## Scripts
+- `npm run dev`: inicia el servidor de desarrollo.
+- `npm run build`: genera el bundle de producción.
+- `npm run preview`: vista previa del build.
+- `npm run lint`: linting con ESLint + React/TypeScript.
+- `npm run test`: pruebas con Vitest/Testing Library.
 
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Notas de seguridad
+- Las credenciales y URLs sensibles se leen desde variables de entorno y no se incrustan en el bundle.
+- La caché de autenticación usa `sessionStorage` para limitar la persistencia de datos PII.

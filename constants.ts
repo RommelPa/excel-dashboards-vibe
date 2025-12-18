@@ -1,5 +1,7 @@
 import { ChartConfig } from './types';
 
+const DEFAULT_MAX_BLANKS = Number(import.meta.env.VITE_BLANK_THRESHOLD ?? 6);
+
 export const CHART_CONFIGS: ChartConfig[] = [
   // --- A) FACTURACION ---
   {
@@ -8,6 +10,7 @@ export const CHART_CONFIGS: ChartConfig[] = [
     fileType: 'facturacion',
     sheet: "Precio Medio",
     categoryStartCell: "E23",
+    maxConsecutiveBlanks: DEFAULT_MAX_BLANKS,
     type: 'bar',
     series: [
       { nameCell: "C25", valuesStartCell: "E25" },
@@ -22,6 +25,7 @@ export const CHART_CONFIGS: ChartConfig[] = [
     fileType: 'facturacion',
     sheet: "VENTAS (MWh)",
     categoryStartCell: "F63",
+    maxConsecutiveBlanks: DEFAULT_MAX_BLANKS,
     type: 'bar',
     stack: true,
     series: [
@@ -38,6 +42,7 @@ export const CHART_CONFIGS: ChartConfig[] = [
     fileType: 'facturacion',
     sheet: "VENTAS (S)",
     categoryStartCell: "F2",
+    maxConsecutiveBlanks: DEFAULT_MAX_BLANKS,
     type: 'bar',
     series: [
       { nameCell: "C4", valuesStartCell: "F4" }, 
@@ -52,6 +57,7 @@ export const CHART_CONFIGS: ChartConfig[] = [
     fileType: 'facturacion',
     sheet: "Participación",
     categoryStartCell: "C4",
+    maxConsecutiveBlanks: DEFAULT_MAX_BLANKS,
     type: 'bar',
     series: [
       { nameCell: "B5", valuesStartCell: "C5" },
@@ -64,6 +70,7 @@ export const CHART_CONFIGS: ChartConfig[] = [
     fileType: 'facturacion',
     sheet: "Despacho",
     categoryStartCell: "C5",
+    maxConsecutiveBlanks: DEFAULT_MAX_BLANKS,
     type: 'bar',
     series: [
       { nameCell: "B6", valuesStartCell: "C6" },
@@ -77,6 +84,7 @@ export const CHART_CONFIGS: ChartConfig[] = [
     sheet: "Margen Comercial",
     categoryStartCell: "D3", 
     categoryStartCellRow2: "D4", // Special 2-row category
+    maxConsecutiveBlanks: DEFAULT_MAX_BLANKS,
     type: 'bar',
     series: [
       { nameRange: "B5:C5", valuesStartCell: "D5" },
@@ -91,6 +99,7 @@ export const CHART_CONFIGS: ChartConfig[] = [
     fileType: 'balance',
     sheet: "Perfil",
     categoryStartCell: "C3", // Dynamic: starts at C3, grows right
+    maxConsecutiveBlanks: DEFAULT_MAX_BLANKS,
     type: 'line', 
     disableDataZoom: false,
     initialZoomLastN: 24, 

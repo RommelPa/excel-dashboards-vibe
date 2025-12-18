@@ -1,15 +1,18 @@
 import { Configuration, PopupRequest } from "@azure/msal-browser";
 
+const authority = import.meta.env.VITE_MSAL_AUTHORITY || "https://login.microsoftonline.com/common";
+const clientId = import.meta.env.VITE_MSAL_CLIENT_ID || "";
+
 // --- CONFIGURACIÓN MSAL ---
 export const msalConfig: Configuration = {
   auth: {
-    clientId: "874f6d0d-3d75-4e7e-8fe8-1170401bec02", 
-    authority: "https://login.microsoftonline.com/17d96fc3-4c56-4adb-a9de-a1b922b14554", // Usar common para multi-tenant o personal
-    redirectUri: window.location.origin + "/",
-    postLogoutRedirectUri: window.location.origin + "/",
+    clientId,
+    authority,
+    redirectUri: import.meta.env.VITE_MSAL_REDIRECT_URI || window.location.origin + "/",
+    postLogoutRedirectUri: import.meta.env.VITE_MSAL_POST_LOGOUT_REDIRECT_URI || window.location.origin + "/",
   },
   cache: {
-    cacheLocation: "localStorage", 
+    cacheLocation: "sessionStorage",
     storeAuthStateInCookie: false,
   },
 };

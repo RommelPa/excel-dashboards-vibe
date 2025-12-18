@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { useMsal } from "@azure/msal-react";
 import { loginRequest, advancedRequest } from "../services/authConfig";
 import { SharePointConfig, FileSyncStatus, FileType } from '../types';
-import { Cloud, RefreshCw, LogIn, Link as LinkIcon, Clock, CheckCircle, AlertCircle, Wifi, ShieldAlert, LockKeyhole } from 'lucide-react';
+import { Cloud, RefreshCw, LogIn, Link as LinkIcon, Clock, Wifi, ShieldAlert, LockKeyhole } from 'lucide-react';
+import { SyncStatusBadge } from './SyncStatusBadge';
 
 interface SharePointPanelProps {
   config: SharePointConfig;
   onConfigChange: (newConfig: SharePointConfig) => void;
+  onLinkChange: (type: FileType, link: string) => void;
   onSync: (onlyCheckMeta?: boolean) => void;
   syncStatus: Record<FileType, FileSyncStatus>;
   isSyncing: boolean;
@@ -15,6 +17,7 @@ interface SharePointPanelProps {
 const SharePointPanel: React.FC<SharePointPanelProps> = ({ 
     config, 
     onConfigChange, 
+    onLinkChange,
     onSync, 
     syncStatus,
     isSyncing
@@ -28,7 +31,8 @@ const SharePointPanel: React.FC<SharePointPanelProps> = ({
     setAuthError(null);
     instance.loginPopup(loginRequest).catch(e => {
         console.error(e);
-        setAuthError(e.message);
+        const message = e instanceof Error ? e.message : 'No se pudo iniciar sesión.';
+        setAuthError(message);
     });
   };
 
@@ -49,10 +53,7 @@ const SharePointPanel: React.FC<SharePointPanelProps> = ({
   };
 
   const updateLink = (type: 'facturacion' | 'balance', val: string) => {
-      onConfigChange({
-          ...config,
-          [type === 'facturacion' ? 'facturacionLink' : 'balanceLink']: val
-      });
+      onLinkChange(type, val);
   };
 
   const toggleAutoRefresh = () => {
@@ -64,13 +65,8 @@ const SharePointPanel: React.FC<SharePointPanelProps> = ({
 
   const renderStatus = (type: FileType) => {
       const st = syncStatus[type];
-      if (st.status === 'idle') return <span className="text-gray-400">-</span>;
-      if (st.status === 'checking') return <span className="text-blue-500 animate-pulse">Conectando...</span>;
-      if (st.status === 'loading') return <span className="text-indigo-500 animate-pulse">Descargando...</span>;
-      if (st.status === 'error') return <span className="text-red-500 flex items-center font-medium"><AlertCircle size={14} className="mr-1"/> Error</span>;
-      if (st.status === 'needs_consent') return <span className="text-amber-600 flex items-center font-medium"><LockKeyhole size={14} className="mr-1"/> Permisos</span>;
-      if (st.status === 'success') return <span className="text-green-600 flex items-center font-medium"><CheckCircle size={14} className="mr-1"/> Actualizado</span>;
-      if (st.status === 'up-to-date') return <span className="text-slate-500 flex items-center font-medium bg-slate-100 px-2 py-0.5 rounded-full text-xs">Sin cambios</span>;
+      if (!st) return null;
+      return <SyncStatusBadge status={st} />;
   };
 
   return (
