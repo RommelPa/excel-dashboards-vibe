@@ -1,0 +1,5 @@
+{
+  "name": "Excel Dashboards Vibe",
+  "description": "Parses monthly Excel reports (Facturación & Balance) to generate interactive dashboards using SheetJS and ECharts.",
+  "requestFramePermissions": []
+}
