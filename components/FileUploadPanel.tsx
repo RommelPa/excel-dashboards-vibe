@@ -17,7 +17,6 @@ const FileUploadPanel: React.FC<FileUploadPanelProps> = ({ files, onFileUpload, 
   const handleFileChange = (type: FileType) => (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      console.log(`[Manual Upload] Archivo seleccionado para ${type}: ${file.name} (${file.size} bytes)`);
       onFileUpload(type, file);
     }
   };

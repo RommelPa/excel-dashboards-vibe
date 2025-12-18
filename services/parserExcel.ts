@@ -1,9 +1,30 @@
 import * as XLSX from 'xlsx';
 import { ChartConfig, ParsedChartData, SeriesConfig } from '../types';
 
+const DEFAULT_BLANK_THRESHOLD = Number(import.meta.env.VITE_BLANK_THRESHOLD ?? 6);
+const MAX_COLS = 500;
+const MAX_ALLOWED_FILE_SIZE_MB = Number(import.meta.env.VITE_MAX_FILE_SIZE_MB ?? 30);
+
 // --- HELPERS ---
 
 const SPANISH_MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+export const validateWorkbookSize = (file: File) => {
+  const maxBytes = MAX_ALLOWED_FILE_SIZE_MB * 1024 * 1024;
+  if (file.size > maxBytes) {
+    throw new Error(`El archivo supera el límite de ${MAX_ALLOWED_FILE_SIZE_MB}MB.`);
+  }
+};
+
+const normalizeNumber = (value: any): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') {
+    return isNaN(value) ? null : value;
+  }
+  const sanitized = String(value).replace(/\s+/g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '');
+  const parsed = Number.parseFloat(sanitized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 // Helper: Format category cells to "mmm-yy" in Spanish
 const formatExcelCategory = (cell: any): string => {
@@ -62,11 +83,15 @@ interface DynamicRowResult {
 }
 
 // Read row starting at startCell until N consecutive blanks or maxCols
-const readRowUntilBlank = (sheet: any, startCell: string, mode: 'number' | 'category'): DynamicRowResult => {
+const readRowUntilBlank = (
+    sheet: any,
+    startCell: string,
+    mode: 'number' | 'category',
+    threshold: number = DEFAULT_BLANK_THRESHOLD
+): DynamicRowResult => {
     const start = XLSX.utils.decode_cell(startCell);
     const values: any[] = [];
-    const MAX_COLS = 500; // Hard limit safety
-    const BLANK_THRESHOLD = 3; // Stop after 3 empty cells
+    const effectiveThreshold = Math.max(2, threshold);
     
     let consecutiveBlanks = 0;
     let currentCol = start.c;
@@ -84,35 +109,31 @@ const readRowUntilBlank = (sheet: any, startCell: string, mode: 'number' | 'cate
             if (mode === 'category') {
                 val = formatExcelCategory(cell);
             } else {
-                val = cell.v; // keep raw for numbers
+                val = normalizeNumber(cell.v);
             }
         }
 
         if (isEmpty) {
             consecutiveBlanks++;
-            values.push(null); // placeholder
+            values.push(null);
         } else {
             consecutiveBlanks = 0;
             values.push(val);
             lastValidCol = currentCol;
         }
 
-        if (consecutiveBlanks >= BLANK_THRESHOLD) {
+        if (consecutiveBlanks >= effectiveThreshold) {
             break;
         }
         currentCol++;
     }
 
-    // Trim trailing nulls caused by the blank detection
-    const trimCount = consecutiveBlanks;
-    const finalValues = values.slice(0, values.length - trimCount);
-    
     const endCellAddr = XLSX.utils.encode_cell({ r: start.r, c: lastValidCol });
 
     return {
-        values: finalValues,
+        values,
         endColIndex: lastValidCol,
-        endCellAddr: endCellAddr
+        endCellAddr
     };
 };
 
@@ -124,12 +145,7 @@ const readRowFixedLen = (sheet: any, startCell: string, length: number): any[] =
     for (let i = 0; i < length; i++) {
         const addr = XLSX.utils.encode_cell({ r: start.r, c: start.c + i });
         const cell = sheet[addr];
-        if (cell && cell.v !== undefined && cell.v !== null && cell.v !== '') {
-             const num = Number(cell.v);
-             values.push(isNaN(num) ? null : num);
-        } else {
-             values.push(null);
-        }
+        values.push(normalizeNumber(cell?.v));
     }
     return values;
 };
@@ -167,6 +183,43 @@ const filterCategories = (categories: string[], isFacturacion: boolean) => {
     return categories;
 };
 
+const findCellByPattern = (sheet: any, pattern?: string, preferredRow?: number) => {
+    if (!pattern) return null;
+    const normalizedPattern = pattern.toLowerCase();
+    const matches: { addr: string; row: number }[] = [];
+    Object.keys(sheet).forEach(key => {
+        if (key.startsWith('!')) return;
+        const cell = sheet[key];
+        const value = cell?.v;
+        if (typeof value === 'string' && value.toLowerCase().includes(normalizedPattern)) {
+            const decoded = XLSX.utils.decode_cell(key);
+            matches.push({ addr: key, row: decoded.r });
+        }
+    });
+    if (matches.length === 0) return null;
+    if (preferredRow !== undefined) {
+        const rowMatch = matches.find(m => m.row === preferredRow);
+        if (rowMatch) return rowMatch.addr;
+    }
+    return matches[0].addr;
+};
+
+const resolveStartCell = (sheet: any, fallback: string, pattern?: string) => {
+    if (!sheet) return fallback;
+    const decoded = XLSX.utils.decode_cell(fallback);
+    const match = findCellByPattern(sheet, pattern, decoded.r);
+    return match ?? fallback;
+};
+
+const resolveSeriesStartCell = (sheet: any, fallback: string, pattern?: string) => {
+    if (!sheet || !pattern) return fallback;
+    const decoded = XLSX.utils.decode_cell(fallback);
+    const match = findCellByPattern(sheet, pattern, decoded.r);
+    if (!match) return fallback;
+    const matchedDecoded = XLSX.utils.decode_cell(match);
+    return XLSX.utils.encode_cell({ r: decoded.r, c: matchedDecoded.c });
+};
+
 // --- EXPORTS ---
 
 // New: Accepts ArrayBuffer directly (for SharePoint)
@@ -176,6 +229,7 @@ export const parseArrayBuffer = (buffer: ArrayBuffer): any => {
 
 // Wraps ArrayBuffer parser for File inputs
 export const parseWorkbook = async (file: File): Promise<any> => {
+  validateWorkbookSize(file);
   const arrayBuffer = await file.arrayBuffer();
   return parseArrayBuffer(arrayBuffer);
 };
@@ -186,6 +240,7 @@ export const processChartData = (wb: any, config: ChartConfig): ParsedChartData 
     categories: [],
     series: [],
     calculatedRange: "",
+    discardedColumns: 0,
     validation: {
       sheetExists: false,
       hasData: false,
@@ -203,7 +258,8 @@ export const processChartData = (wb: any, config: ChartConfig): ParsedChartData 
 
   // 1. Process Categories (Dynamic)
   try {
-      const catResult = readRowUntilBlank(sheet, config.categoryStartCell, 'category');
+      const startCell = resolveStartCell(sheet, config.categoryStartCell, config.categoryHeaderPattern);
+      const catResult = readRowUntilBlank(sheet, startCell, 'category', config.maxConsecutiveBlanks);
       let rawCategories = catResult.values;
       let finalEndCellAddr = catResult.endCellAddr;
       
@@ -225,16 +281,17 @@ export const processChartData = (wb: any, config: ChartConfig): ParsedChartData 
       // --- FILTER LOGIC (Remove 'Total' columns) ---
       const isFacturacion = config.fileType === 'facturacion';
       const filteredCategories = filterCategories(rawCategories, isFacturacion);
+      result.discardedColumns = rawCategories.length - filteredCategories.length;
 
       // Recalculate range string if trimmed
       if (filteredCategories.length !== rawCategories.length) {
-          const start = XLSX.utils.decode_cell(config.categoryStartCell);
+          const start = XLSX.utils.decode_cell(startCell);
           const newEndCol = start.c + filteredCategories.length - 1;
           finalEndCellAddr = XLSX.utils.encode_cell({ r: start.r, c: newEndCol });
       }
 
       result.categories = filteredCategories;
-      result.calculatedRange = `${config.categoryStartCell}:${finalEndCellAddr}`;
+      result.calculatedRange = `${startCell}:${finalEndCellAddr}`;
 
       if (result.categories.length < 2) {
           // Warning if too short, but allow it if file is just starting
@@ -253,6 +310,7 @@ export const processChartData = (wb: any, config: ChartConfig): ParsedChartData 
   const expectedLen = result.categories.length;
   let totalDataPoints = 0;
   let hasCalcWarning = false;
+  let invalidNumbers = 0;
 
   if (expectedLen > 0) {
       config.series.forEach((sConfig: SeriesConfig, idx) => {
@@ -264,8 +322,11 @@ export const processChartData = (wb: any, config: ChartConfig): ParsedChartData 
             seriesName = getRangeTextJoined(sheet, sConfig.nameRange);
         }
 
+        const valuesStartCell = resolveSeriesStartCell(sheet, sConfig.valuesStartCell, sConfig.valueHeaderPattern);
+
         // Values (Read ONLY the expected length)
-        const cleanValues = readRowFixedLen(sheet, sConfig.valuesStartCell, expectedLen);
+        const cleanValues = readRowFixedLen(sheet, valuesStartCell, expectedLen);
+        invalidNumbers += cleanValues.filter(v => v === null).length;
 
         // Validation Check
         const missingPoints = cleanValues.filter(v => v === null).length;
@@ -291,6 +352,10 @@ export const processChartData = (wb: any, config: ChartConfig): ParsedChartData 
 
   if (hasCalcWarning) {
       result.validation.warnings.push("Posible falta de valores calculados (muchos vacíos). Abra el Excel, recalcular y guardar.");
+  }
+
+  if (invalidNumbers > 0) {
+      result.validation.warnings.push(`Se normalizaron valores no numéricos o vacíos (${invalidNumbers}).`);
   }
 
   return result;

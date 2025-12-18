@@ -1,5 +1,42 @@
 // Logic to interact with Microsoft Graph API for SharePoint/OneDrive shared links
 
+const BASE_GRAPH_URL = "https://graph.microsoft.com/v1.0";
+const MAX_RETRIES = 3;
+const BASE_DELAY = 400;
+
+const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+const parseErrorResponse = async (response: Response) => {
+    try {
+        const asJson = await response.clone().json();
+        return asJson.error?.message || JSON.stringify(asJson);
+    } catch {
+        try {
+            return await response.text();
+        } catch {
+            return response.statusText || 'Error desconocido';
+        }
+    }
+};
+
+const fetchWithRetry = async (url: string, accessToken: string, attempt = 0): Promise<Response> => {
+    const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    if (response.ok) return response;
+
+    if ((response.status === 429 || response.status === 503) && attempt < MAX_RETRIES) {
+        const retryAfterHeader = response.headers.get('Retry-After');
+        const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : (BASE_DELAY * Math.pow(2, attempt));
+        await sleep(retryAfterMs);
+        return fetchWithRetry(url, accessToken, attempt + 1);
+    }
+
+    const detail = await parseErrorResponse(response);
+    throw new Error(`Graph error ${response.status}: ${detail}`);
+};
+
 // 1. Encode URL to Sharing Token (u!...)
 // Specification: https://learn.microsoft.com/en-us/graph/api/shares-get?view=graph-rest-1.0
 // Requisito: base64url encoding (RFC 4648) sin padding, '+' -> '-', '/' -> '_'
@@ -19,17 +56,7 @@ export const getShareIdFromLink = (link: string): string => {
 
 // 2. Get Drive Item Metadata (Check ETag/Mod Date)
 export const getDriveItemMeta = async (shareId: string, accessToken: string) => {
-    const response = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem`, {
-        headers: {
-            Authorization: `Bearer ${accessToken}`
-        }
-    });
-
-    if (!response.ok) {
-        const err = await response.json();
-        // Return a clear error message
-        throw new Error(err.error?.message || `Error ${response.status}: No se pudo acceder al archivo.`);
-    }
+    const response = await fetchWithRetry(`${BASE_GRAPH_URL}/shares/${shareId}/driveItem`, accessToken);
 
     const data = await response.json();
     return {
@@ -43,16 +70,6 @@ export const getDriveItemMeta = async (shareId: string, accessToken: string) => 
 
 // 3. Download Content (Returns ArrayBuffer for SheetJS)
 export const downloadDriveItemContent = async (shareId: string, accessToken: string): Promise<ArrayBuffer> => {
-    // We can use the /content endpoint on the driveItem
-    const response = await fetch(`https://graph.microsoft.com/v1.0/shares/${shareId}/driveItem/content`, {
-        headers: {
-            Authorization: `Bearer ${accessToken}`
-        }
-    });
-
-    if (!response.ok) {
-         throw new Error("Error descargando contenido binario del archivo");
-    }
-
+    const response = await fetchWithRetry(`${BASE_GRAPH_URL}/shares/${shareId}/driveItem/content`, accessToken);
     return await response.arrayBuffer();
 };
