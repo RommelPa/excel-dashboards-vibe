@@ -133,7 +133,7 @@ const AppContent: React.FC = () => {
 
         <ValidatorPanel data={parsedData} />
 
-        <Suspense fallback={<div className=\"text-sm text-gray-500\">Cargando paneles...</div>}>
+        <Suspense fallback={<div className="text-sm text-gray-500\">Cargando paneles...</div>}>
           <DashboardTabs parsedData={parsedData} />
         </Suspense>
         

@@ -28,7 +28,7 @@ const MsalReady: React.FC = () => {
   }, []);
 
   if (!ready) {
-    return <div className=\"p-6 text-center text-gray-500\">Inicializando autenticación...</div>;
+    return <div className="p-6 text-center text-gray-500\">Inicializando autenticación...</div>;
   }
 
   return (
